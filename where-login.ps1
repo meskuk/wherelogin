@@ -1,11 +1,17 @@
 $searcher = New-Object System.DirectoryServices.DirectorySearcher
 $searcher.SearchRoot = New-Object System.DirectoryServices.DirectoryEntry("")
 
-# Find my last logon
-$searcher.Filter = "(cn=USERNAME-HERE)"
+$target = $Args[0]
+# Find the user's last logon
+$searcher.Filter = "(cn=$target)"
 # Note: each property is still a ResultPropertyCollection so get
 # the first item
-$lastlogon = $searcher.FindOne().Properties.lastlogontimestamp[0]
+$res = $searcher.FindOne()
+if ($res.Properties.lastlogontimestamp.Length -eq 0) {
+    echo "Could not find lastLogonTimestamp for $target"
+    exit
+}
+$lastlogon = $res.Properties.lastlogontimestamp[0]
 $lastlogondt = ([datetime]::FromFileTime($lastlogon))
 
 # TODO: make this an arg/flag please
