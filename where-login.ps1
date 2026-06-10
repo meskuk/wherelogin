@@ -1,5 +1,7 @@
 $searcher = New-Object System.DirectoryServices.DirectorySearcher
-$searcher.SearchRoot = New-Object System.DirectoryServices.DirectoryEntry("")
+# https://stackoverflow.com/a/41112365
+# https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.directoryentry.-ctor?view=net-11.0-pp
+$searcher.SearchRoot = New-Object System.DirectoryServices.DirectoryEntry("LDAP://<DOMAIN-CONTROLLER>")
 
 $target = $Args[0]
 # Find the user's last logon
@@ -7,18 +9,18 @@ $searcher.Filter = "(cn=$target)"
 # Note: each property is still a ResultPropertyCollection so get
 # the first item
 $res = $searcher.FindOne()
-if ($res.Properties.lastlogontimestamp.Length -eq 0) {
-    echo "Could not find lastLogonTimestamp for $target"
+if ($res.Properties.lastlogon.Length -eq 0) {
+    echo "Could not find lastLogon for $target"
     exit
 }
-$lastlogon = $res.Properties.lastlogontimestamp[0]
+$lastlogon = $res.Properties.lastlogon[0]
 $lastlogondt = ([datetime]::FromFileTime($lastlogon))
 
 # TODO: make this an arg/flag please
-$RANGE = [timespan]::new(4, 0, 0) # 4 hours appears to work best
+$RANGE = [timespan]::new(0, 5, 0) # 5 minutes
 
 # TODO: AddHours, AddMinutes, etc methods exist
-# Set a minimum lastlogontimestamp
+# Set a minimum lastlogon
 $minimum = $lastlogondt.Subtract($RANGE)
 $minimum = $minimum.ToFileTime()
 
@@ -29,14 +31,14 @@ $minimum = $minimum.ToFileTime()
 #$maximum = $maximum.ToFileTime()
 
 # Now find anything else where lastlogontimestamp is within the range
-$searcher.Filter = "(&(objectClass=computer)(lastLogonTimestamp>=$minimum)(lastLogonTimestamp<=$lastlogon))"
+$searcher.Filter = "(&(objectClass=computer)(lastLogon>=$minimum)(lastLogon<=$lastlogon))"
 $results = $searcher.FindAll()
 
 $objs = foreach ($result in $results) {
     $props = $result.Properties
     [PSCustomObject]@{
         Name = $props.cn[0]
-        Logon = [datetime]::FromFileTime($props.lastlogontimestamp[0])
+        Logon = [datetime]::FromFileTime($props.lastlogon[0])
         UserLogon = $lastlogondt # just for easy comparison
     }
 }
